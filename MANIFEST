@@ -1,0 +1,15 @@
+Build.PL
+Changes
+lib/Devel/eps.pm
+lib/Devel/TraceDeps.pm
+lib/Devel/TraceDeps/Scan.pm
+MANIFEST			This list of files
+MANIFEST.SKIP
+META.yml
+README
+samples/fail_eval.pl
+samples/nothing.pl
+t/00-load.t
+t/api_scans.t
+t/scanload.t
+todo

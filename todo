@@ -1,0 +1,8 @@
+o replace CORE::GLOBAL::caller and pretend I'm not here?
+o proxy DynaLoader/XSLoader bits
+  o DynaLoader => Cairo, Date::Simple
+  o XSLoader   => Cwd
+o prove hook
+  o best to not define the trace functions at all in the toplevel
+  process, so load a different module as a frontend for tree?  epstree?
+o perl -e support for subprocesses in tree mode?
