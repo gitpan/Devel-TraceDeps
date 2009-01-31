@@ -15,7 +15,7 @@ sub undent {
   return($s);
 }
 {
-  my $scan = Devel::TraceDeps::Scan->load(undent(<<'  THIS'));
+  my $scan = Devel::TraceDeps::Scan->load(\(undent(<<'  THIS')));
   main
     -----
     req: foo.pm

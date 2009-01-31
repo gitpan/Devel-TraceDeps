@@ -40,5 +40,10 @@ my $s = 'Devel::TraceDeps::Scan';
   is(scalar(@list), 1);
   is($list[0]->ver, '5.005');
 }
+{
+  my $got = $s->scan(file => 'samples/returns_list.pl');
+  is(scalar($got->items), 1);
+  ok(! ($got->items)[0]->fail, 'return');
+}
 
 # vim:ts=2:sw=2:et:sta

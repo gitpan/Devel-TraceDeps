@@ -1,5 +1,5 @@
 package Devel::TraceDeps::Scan;
-$VERSION = v0.0.2;
+$VERSION = v0.0.3;
 
 use warnings;
 use strict;
@@ -9,22 +9,6 @@ use Carp;
 use Class::Accessor::Classy;
 with 'new';
 no  Class::Accessor::Classy;
-{
-package Devel::TraceDeps::Scan::Item;
-use Class::Accessor::Classy;
-with 'new';
-ro qw(
-  by
-  req
-  ver
-  ado
-  file
-  line
-  fail
-  err
-);
-no  Class::Accessor::Classy;
-}
 
 =head1 NAME
 
@@ -63,9 +47,8 @@ sub scan {
   # bah IPC::Cmd gives me invalid free or something
   open(my $fh, '-|', $^X, '-MDevel::TraceDeps', @cmd) or
     croak("cannot run @cmd $!");
-  my $buffer = do {local $/; readline($fh)};
 
-  my $self = $me->load($buffer);
+  my $self = $me->load($fh);
   return($self);
 } # end subroutine scan definition
 ########################################################################
@@ -73,6 +56,9 @@ sub scan {
 =head1 Retrieval
 
 =head2 load
+
+C<$source> may be a filename, or a reference to an open filehandle or
+string.
 
   my $scan = Devel::TraceDeps::Scan->load($source);
 
@@ -82,15 +68,22 @@ sub load {
   my $package = shift;
   my ($source) = @_;
 
-  my $self = $package->new; # XXX or are we loading more
+  my $self = ref($package) ? $package : $package->new;
 
   my $fh;
-  if(ref($source)) {
-    $fh = $source;
+  if(my $r = ref($source)) {
+    if($r eq 'GLOB' or
+      $source =~ m/=GLOB\(0x[0-9a-f]+\)$/ or
+      eval {overload::Method($source, '<>')}
+    ) {
+      $fh = $source;
+    }
+    else {
+      open($fh, '<', $source) or die "open string failed $!";
+    }
   }
   else {
-    # TODO filename
-    open($fh, '<', \$source) or die "open failed $!";
+    open($fh, '<', $source) or die "open file '$source' failed $!";
   }
 
   $self->{order} ||= [];
@@ -185,7 +178,7 @@ sub required {
   my @out;
   my %seen;
   foreach my $item ($self->items) {
-    my $key = $item->req || $item->ado;
+    my $key = $item->req || $item->did;
     $seen{$key} and next;
     $seen{$key} = 1;
     push(@out, $item);
@@ -209,6 +202,77 @@ sub loaded {
 ########################################################################
 
 
+=head1 Item objects
+
+C<Devel::TraceDeps::Scan::Item> objects are returned by several of the
+above methods.  The have the following attributes:
+
+=over
+
+=item by
+
+The package which required this item (caller).
+
+=item trace
+
+A string of sequence numbers indicating the tree of this call.
+
+=item file
+
+Filename from caller().
+
+=item line
+
+Line number from caller().
+
+=item req
+
+The require()d module filename (as found in C<keys %INC> -- e.g.  'use
+Foo::Bar' would appear as 'Foo/Bar.pm'.)
+
+This will typically be a relative path (within @INC), but might be
+absolute or ever relative to './' (depending on how use/require/do was
+called.
+
+=item ver
+
+Item is a requirement for a minimum perl version.  If 'req' is empty,
+look here.
+
+=item did
+
+The argument to do("filename").
+
+=item fail
+
+True if the require() failed.  This probably means that the file does
+not exist (e.g. C<eval {require thing}> or C<do("whatever")>)
+
+=item err
+
+Any $@ or $! found.
+
+=back
+
+=cut
+
+{
+package Devel::TraceDeps::Scan::Item;
+use Class::Accessor::Classy;
+with 'new';
+ro qw(
+  by
+  trace
+  req
+  ver
+  did
+  file
+  line
+  fail
+  err
+);
+no  Class::Accessor::Classy;
+}
 
 =head1 AUTHOR
 

@@ -1,5 +1,5 @@
 package Devel::eps;
-$VERSION = v0.0.2;
+$VERSION = v0.0.3;
 
 my $fakery = 'kwalitee police look the other way now please
 use strict;

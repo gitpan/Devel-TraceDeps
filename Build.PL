@@ -10,11 +10,14 @@ my $builder = $build_class->new(
   dist_version_from   => 'lib/Devel/TraceDeps.pm',
   requires => {
     'Class::Accessor::Classy' => 'v0.9.0',
+    'Getopt::AsDocumented'    => 0,
+    'File::Fu'                => 'v0.0.6',
   },
   build_requires => {
     'Module::Build' => 0.26,
     'Test::More'    => 0,
   },
+  configure_requires => { 'Module::Build' => 0.31 },
   add_to_cleanup      => [ qw(Devel-TraceDeps-* META.yml)],
   # create_makefile_pl => 'passthrough',
   meta_merge => {
@@ -25,7 +28,7 @@ my $builder = $build_class->new(
         'http://rt.cpan.org/NoAuth/Bugs.html?Dist=Devel-TraceDeps',
       #MailingList => 'mailto:...',
       repository =>
-        'http://scratchcomputing.com/svn/Devel-TraceDeps/trunk',
+        'http://svn.scratchcomputing.com/Devel-TraceDeps/trunk',
     }
   },
 );

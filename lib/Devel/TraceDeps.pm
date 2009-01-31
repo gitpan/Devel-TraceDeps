@@ -1,5 +1,5 @@
 package Devel::TraceDeps;
-$VERSION = v0.0.2;
+$VERSION = v0.0.3;
 
 =head1 NAME
 
@@ -31,17 +31,22 @@ Devel::TraceDeps delivers a comprehensive report of everything which was
 loaded into your perl process via the C<use>, C<require>, or
 C<do($file)> mechanisms.
 
-Unlike Devel::TraceLoad, it does load any modules itself and is intended
-to be very unintrusive.  Unlike Module::ScanDeps, it is designed to run
-alongside your test suite.
+Unlike Devel::TraceLoad, this does not load any modules itself and is
+intended to be very unintrusive.  Unlike Module::ScanDeps, it is
+designed to run alongside your test suite.
 
 For access to the resultant data, see the API in
 L<Devel::TraceDeps::Scan>.
 
-In tree mode, forking processes and various other runtime effects should
-be supported -- tests and patches welcome.
+In tree mode, forking processes and various other runtime effects
+*should* be supported but surprises abound in this realm -- tests and
+patches welcome.
 
 TODO reports on shared objects loaded by DynaLoader/XSLoader.
+
+TODO somehow catching the 'use foo 1.2' VERSION assertions.  This is
+handled by use() and is therefore outside of our reach (without some
+tricks involving $SIG{__DIE__} or such.)
 
 =cut
 
@@ -95,6 +100,10 @@ Other data would be
 
 my %store;
 
+# tracking the steps in the tree
+my @trace;
+my $tracemark = 0;
+
 my $debugging = 0; # for -d:... usage
 BEGIN {
   if(defined(%DB::)) {
@@ -106,10 +115,26 @@ BEGIN {
 
     my ($p, $f, $l) = CORE::caller;
     my $list = $store{$p} ||= [];
-    push(@$list, {file => $f, line => $l, req => $module});
-    #warn "$p does $target ($f, $l)\n";
 
-    CORE::do($target);
+    push(@trace, ++$tracemark); $tracemark = 0;
+    push(@$list, my $req = {file => $f, line => $l, did => $target,
+      trace => join('-', @trace),
+    });
+    #warn "$p does $target ($f, $l)\n";
+    my $x = bless({mod => $target, req => $req, by => \@caller},
+      'Devel::TraceDeps::Watch');
+
+    my $ret = CORE::do($target);
+    return($ret) if($ret);
+    #$x->{err} = $@ if($@);
+    if(defined($ret)) {
+      $req->{err} = "returned '$ret'" unless($ret);
+    }
+    else {
+      $req->{err} = $!;
+    }
+
+    return($ret);
   };
   *CORE::GLOBAL::require = sub {
     my ($required) = @_;
@@ -134,13 +159,23 @@ BEGIN {
       my $version = 
         $module eq '5' ? '5.000' :
         $module =~ m/^5(?:\.|$)/ ? $module : sprintf("%vd", $module);
-      push(@$list, {file => $f, line => $l, ver => $version});
+      push(@$list, {file => $f, line => $l, ver => $version,
+        trace => join('-', @trace, ++$tracemark),
+      });
       return CORE::require $required;
     }
 
-    push(@$list, my $req = {file => $f, line => $l, req => $module});
+    push(@trace, ++$tracemark); $tracemark = 0;
 
-    exists($INC{$module}) and return(1);
+    push(@$list, my $req = {
+      file => $f, line => $l, req => $module,
+      trace => join('-', @trace),
+    });
+
+    if(exists($INC{$module})) {
+      $tracemark = pop(@trace);
+      return(1);
+    }
 
     # delicious and necessary evil: the object goes out of scope in that
     # moment between the here and the there, thus: after the
@@ -152,7 +187,7 @@ BEGIN {
 
     # apparently goto doesn't work here,
     # so we need to tweak the caller stack?
-    CORE::require $module;
+    return scalar(CORE::require($module));
   };
 }
 {
@@ -163,6 +198,7 @@ BEGIN {
     unless($INC{$self->{mod}}) {
       $req->{fail} = 1;
     }
+    $tracemark = pop(@trace);
 
     # hmm, can we tell if this is global cleanup time?
 
